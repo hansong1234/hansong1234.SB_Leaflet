@@ -1,0 +1,801 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Thermal Curry Main</title>
+
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    body {
+      width: 100%;
+      min-height: 100vh;
+      background: #000;
+      font-family: Arial, Helvetica, sans-serif;
+      overflow: hidden;
+      color: #fff;
+    }
+
+    .mobile-page {
+      width: 100%;
+      max-width: 430px;
+      height: 100vh;
+      height: 100dvh;
+      margin: 0 auto;
+      position: relative;
+      background: #000;
+      overflow: hidden;
+    }
+
+    .flash-overlay {
+      position: absolute;
+      inset: 0;
+      background: #fff;
+      opacity: 0;
+      pointer-events: none;
+      z-index: 100;
+    }
+
+    .flash-overlay.active {
+      animation: flashEffect 0.28s ease-out forwards;
+    }
+
+    @keyframes flashEffect {
+      0% {
+        opacity: 0;
+      }
+
+      20% {
+        opacity: 0.95;
+      }
+
+      100% {
+        opacity: 0;
+      }
+    }
+
+    .top-logo-wrap {
+      position: absolute;
+      top: 38px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 15;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .top-logo {
+      width: 60px;
+      height: auto;
+      display: block;
+      object-fit: contain;
+    }
+
+    .site-header {
+      position: absolute;
+      top: 0;
+      left: 0;
+      width: 100%;
+      height: 100px;
+      z-index: 30;
+      pointer-events: none;
+    }
+
+    .menu-button {
+      position: absolute;
+      top: 28px;
+      right: 30px;
+      font-size: 1rem;
+      background: none;
+      border: 1px solid white;
+      color: white;
+      padding: 8px 12px;
+      cursor: pointer;
+      z-index: 40;
+      pointer-events: auto;
+    }
+
+    #slide-menu {
+      position: fixed;
+      top: 0;
+      right: -300px;
+      width: 250px;
+      height: 100%;
+      background-color: rgba(15, 15, 26, 0.95);
+      color: white;
+      padding: 60px 20px;
+      box-shadow: -2px 0 10px rgba(0, 0, 0, 0.5);
+      transition: right 0.4s ease;
+      z-index: 999;
+      pointer-events: auto;
+    }
+
+    #slide-menu.open {
+      right: 0;
+    }
+
+    #slide-menu ul {
+      list-style: none;
+      padding: 0;
+    }
+
+    #slide-menu li {
+      margin-bottom: 20px;
+    }
+
+    #slide-menu a,
+    #slide-menu span {
+      color: white;
+      text-decoration: none;
+      font-size: 1rem;
+      cursor: pointer;
+    }
+
+    .close-button {
+      position: absolute;
+      top: 15px;
+      right: 15px;
+      background: none;
+      border: none;
+      color: white;
+      font-size: 1.5rem;
+      cursor: pointer;
+    }
+
+    .poster-section {
+      position: absolute;
+      top: 100px;
+      left: 0;
+      right: 0;
+      bottom: 150px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 0 24px;
+      z-index: 1;
+    }
+
+    .camera-frame {
+      position: relative;
+      width: 76%;
+      max-width: 300px;
+      aspect-ratio: 3 / 4.15;
+      border-radius: 24px;
+      overflow: hidden;
+      background: #000;
+      border: 1px solid rgba(255, 255, 255, 0.2);
+      box-shadow: none;
+    }
+
+    .poster-img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      opacity: 1;
+      transform: scale(1);
+      filter: contrast(1.05) saturate(1.08);
+      transition:
+        opacity 0.35s ease,
+        transform 0.35s ease,
+        filter 0.35s ease;
+    }
+
+    .poster-img.is-hidden {
+      opacity: 0;
+      transform: scale(0.96);
+      filter: blur(4px);
+    }
+
+    .scan-line {
+      position: absolute;
+      left: 0;
+      top: -20%;
+      width: 100%;
+      height: 4px;
+      background: linear-gradient(
+        90deg,
+        transparent,
+        rgba(255, 0, 170, 0.5),
+        rgba(255, 230, 0, 0.95),
+        rgba(255, 80, 0, 0.55),
+        transparent
+      );
+      opacity: 0;
+      pointer-events: none;
+      z-index: 6;
+    }
+
+    .scan-line.active {
+      animation: scanMove 0.85s ease-in-out forwards;
+    }
+
+    @keyframes scanMove {
+      0% {
+        top: -10%;
+        opacity: 0;
+      }
+
+      12% {
+        opacity: 1;
+      }
+
+      88% {
+        opacity: 1;
+      }
+
+      100% {
+        top: 110%;
+        opacity: 0;
+      }
+    }
+
+    .camera-frame::after {
+      content: "";
+      position: absolute;
+      inset: 0;
+      background: repeating-linear-gradient(
+        to bottom,
+        rgba(255, 255, 255, 0.035) 0px,
+        rgba(255, 255, 255, 0.035) 1px,
+        transparent 2px,
+        transparent 5px
+      );
+      pointer-events: none;
+      z-index: 4;
+    }
+
+    .corner {
+      position: absolute;
+      width: 26px;
+      height: 26px;
+      border-color: rgba(255, 0, 190, 0.9);
+      z-index: 7;
+    }
+
+    .corner.left-top {
+      top: 16px;
+      left: 16px;
+      border-top: 2px solid;
+      border-left: 2px solid;
+    }
+
+    .corner.right-top {
+      top: 16px;
+      right: 16px;
+      border-top: 2px solid;
+      border-right: 2px solid;
+    }
+
+    .corner.left-bottom {
+      bottom: 16px;
+      left: 16px;
+      border-bottom: 2px solid;
+      border-left: 2px solid;
+    }
+
+    .corner.right-bottom {
+      bottom: 16px;
+      right: 16px;
+      border-bottom: 2px solid;
+      border-right: 2px solid;
+    }
+
+    .bottom-control {
+      position: absolute;
+      left: 0;
+      bottom: 30px;
+      width: 100%;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 18px;
+      z-index: 20;
+    }
+
+    .dots {
+      display: flex;
+      gap: 12px;
+      z-index: 21;
+    }
+
+    .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: rgba(255, 255, 255, 0.25);
+      transition: 0.25s;
+    }
+
+    .dot.active {
+      background: linear-gradient(135deg, #ff2ca8, #ffb000);
+    }
+
+    /* 셔터는 화면 정중앙, 사진첩은 오른쪽 */
+    .camera-control-row {
+      position: relative;
+      width: 100%;
+      height: 76px;
+    }
+
+    .shutter {
+      width: 76px;
+      height: 76px;
+      border-radius: 50%;
+      border: none;
+      background: linear-gradient(135deg, #ff2ca8, #ffae00);
+      padding: 5px;
+      cursor: pointer;
+      box-shadow: none;
+      transition: transform 0.15s ease;
+      z-index: 22;
+      display: block;
+
+      position: absolute;
+      left: 50%;
+      top: 0;
+      transform: translateX(-50%);
+    }
+
+    .shutter:active {
+      transform: translateX(-50%) scale(0.9);
+    }
+
+    .shutter-inner {
+      width: 100%;
+      height: 100%;
+      border-radius: 50%;
+      background: #fff;
+      display: block;
+    }
+
+    /* 셔터 오른쪽 사진첩 버튼 */
+    .album-button {
+      width: 54px;
+      height: 54px;
+      border-radius: 14px;
+      border: 1px solid rgba(255, 255, 255, 0.7);
+      background: rgba(255, 255, 255, 0.12);
+      cursor: pointer;
+      overflow: hidden;
+      z-index: 22;
+      transition: transform 0.15s ease, background 0.2s ease;
+
+      position: absolute;
+      left: calc(50% + 58px);
+      top: 50%;
+      transform: translateY(-50%);
+    }
+
+    .album-button:active {
+      transform: translateY(-50%) scale(0.92);
+    }
+
+    .album-button img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+      display: block;
+      opacity: 0.85;
+    }
+
+    .album-button::after {
+      content: "첩";
+      position: absolute;
+      right: 4px;
+      bottom: 4px;
+      font-size: 0.7rem;
+      color: #fff;
+      background: rgba(0, 0, 0, 0.65);
+      padding: 2px 5px;
+      border-radius: 8px;
+    }
+
+    /* 사진첩 팝업 */
+    .gallery-modal {
+      position: fixed;
+      inset: 0;
+      background: rgba(0, 0, 0, 0.82);
+      display: none;
+      justify-content: center;
+      align-items: center;
+      z-index: 1000;
+      padding: 24px;
+    }
+
+    .gallery-modal.open {
+      display: flex;
+    }
+
+    .gallery-box {
+      width: 100%;
+      max-width: 390px;
+      position: relative;
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      gap: 14px;
+    }
+
+    /* 사진 원본 비율 유지 */
+    .gallery-image-wrap {
+      width: 100%;
+      max-width: 390px;
+      max-height: 70vh;
+
+      display: flex;
+      justify-content: center;
+      align-items: center;
+
+      border-radius: 24px;
+      overflow: hidden;
+      background: #111;
+      border: 1px solid rgba(255, 255, 255, 0.28);
+    }
+
+    .gallery-image-wrap img {
+      width: auto;
+      height: auto;
+
+      max-width: 100%;
+      max-height: 70vh;
+
+      object-fit: contain;
+      display: block;
+    }
+
+    .gallery-close {
+      position: absolute;
+      top: -44px;
+      right: 0;
+      width: 34px;
+      height: 34px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      font-size: 1.2rem;
+      cursor: pointer;
+    }
+
+    .gallery-nav {
+      width: 100%;
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+    }
+
+    .gallery-nav button {
+      width: 44px;
+      height: 44px;
+      border-radius: 50%;
+      border: 1px solid rgba(255, 255, 255, 0.6);
+      background: rgba(255, 255, 255, 0.12);
+      color: #fff;
+      font-size: 1.4rem;
+      cursor: pointer;
+    }
+
+    .gallery-count {
+      font-size: 0.9rem;
+      color: rgba(255, 255, 255, 0.8);
+    }
+
+    @media (max-width: 360px) {
+      .top-logo-wrap {
+        top: 28px;
+      }
+
+      .top-logo {
+        width: 88px;
+      }
+
+      .site-header {
+        height: 90px;
+      }
+
+      .menu-button {
+        top: 24px;
+        right: 22px;
+        font-size: 0.9rem;
+        padding: 6px 10px;
+      }
+
+      .poster-section {
+        top: 90px;
+        bottom: 138px;
+        padding: 0 20px;
+      }
+
+      .camera-frame {
+        width: 74%;
+        max-width: 270px;
+        border-radius: 20px;
+      }
+
+      .camera-control-row {
+        height: 70px;
+      }
+
+      .shutter {
+        width: 70px;
+        height: 70px;
+      }
+
+      .album-button {
+        width: 50px;
+        height: 50px;
+        left: calc(50% + 54px);
+      }
+
+      .bottom-control {
+        bottom: 24px;
+      }
+
+      #slide-menu {
+        width: 220px;
+      }
+    }
+  </style>
+</head>
+
+<body>
+  <main class="mobile-page">
+
+    <div class="flash-overlay" id="flashOverlay"></div>
+
+    <div class="top-logo-wrap">
+      <img src="img/SB_logo.webp" alt="STAGE BURN 로고" class="top-logo">
+    </div>
+
+    <header class="site-header">
+      <button class="menu-button" onclick="toggleMenu()">☰</button>
+
+      <div id="slide-menu">
+        <button class="close-button" onclick="toggleMenu()">✕</button>
+        <ul>
+          <li><a href="SB_about.html">동아리 소개</a></li>
+          <li><a href="tracks.html">트랙리스트</a></li>
+          <li><a href="playlist.html">플레이리스트</a></li>
+        </ul>
+      </div>
+    </header>
+
+    <section class="poster-section">
+      <div class="camera-frame">
+        <img id="poster" class="poster-img is-hidden" src="img/poster1.webp" alt="열화상 포스터" />
+
+        <div class="scan-line" id="scanLine"></div>
+
+        <div class="corner left-top"></div>
+        <div class="corner right-top"></div>
+        <div class="corner left-bottom"></div>
+        <div class="corner right-bottom"></div>
+      </div>
+    </section>
+
+    <section class="bottom-control">
+      <div class="dots">
+        <span class="dot active"></span>
+        <span class="dot"></span>
+        <span class="dot"></span>
+      </div>
+
+      <div class="camera-control-row">
+        <button class="shutter" id="shutterBtn" aria-label="포스터 촬영 버튼">
+          <span class="shutter-inner"></span>
+        </button>
+
+        <button class="album-button" id="albumBtn" aria-label="사진첩 열기">
+          <img src="img/ch1.webp" alt="사진첩 미리보기">
+        </button>
+      </div>
+    </section>
+
+  </main>
+
+  <!-- 사진첩 팝업 -->
+  <div class="gallery-modal" id="galleryModal">
+    <div class="gallery-box">
+      <button class="gallery-close" id="galleryClose" aria-label="사진첩 닫기">×</button>
+
+      <div class="gallery-image-wrap">
+        <img id="galleryImage" src="img/ch1.webp" alt="사진첩 이미지">
+      </div>
+
+      <div class="gallery-nav">
+        <button id="prevPhoto" aria-label="이전 사진">‹</button>
+        <span class="gallery-count" id="galleryCount">1 / 4</span>
+        <button id="nextPhoto" aria-label="다음 사진">›</button>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    function toggleMenu() {
+      const menu = document.getElementById("slide-menu");
+      menu.classList.toggle("open");
+    }
+
+    document.addEventListener("DOMContentLoaded", () => {
+      const posters = [
+        "img/poster1.webp",
+        "img/poster2.webp",
+        "img/poster3.webp"
+      ];
+
+      let currentIndex = 0;
+      let isAnimating = false;
+
+      const poster = document.getElementById("poster");
+      const shutterBtn = document.getElementById("shutterBtn");
+      const scanLine = document.getElementById("scanLine");
+      const flashOverlay = document.getElementById("flashOverlay");
+      const dots = document.querySelectorAll(".dot");
+
+      function updateDots() {
+        dots.forEach((dot, index) => {
+          dot.classList.toggle("active", index === currentIndex);
+        });
+      }
+
+      function playFlash() {
+        flashOverlay.classList.remove("active");
+        void flashOverlay.offsetWidth;
+        flashOverlay.classList.add("active");
+      }
+
+      function playScanEffect(changePoster = true, firstReveal = false) {
+        if (isAnimating) return;
+        isAnimating = true;
+
+        playFlash();
+
+        if (!firstReveal) {
+          poster.classList.add("is-hidden");
+        }
+
+        setTimeout(() => {
+          scanLine.classList.remove("active");
+          void scanLine.offsetWidth;
+          scanLine.classList.add("active");
+        }, 120);
+
+        setTimeout(() => {
+          if (changePoster) {
+            currentIndex = (currentIndex + 1) % posters.length;
+            poster.src = posters[currentIndex];
+            updateDots();
+          }
+        }, 420);
+
+        setTimeout(() => {
+          poster.classList.remove("is-hidden");
+        }, 600);
+
+        setTimeout(() => {
+          isAnimating = false;
+        }, 1000);
+      }
+
+      setTimeout(() => {
+        playScanEffect(false, true);
+      }, 500);
+
+      shutterBtn.addEventListener("click", () => {
+        playScanEffect(true, false);
+      });
+
+      /* =========================
+         사진첩 기능
+         ========================= */
+
+      /*
+        사진을 추가하려면 아래 배열에 추가하면 됨.
+        예:
+        "img/ch5.png",
+        "img/ch6.png"
+      */
+      const galleryImages = [
+        "img/ch1.webp",
+        "img/ch2.webp",
+
+        "img/ch4.webp"
+      ];
+
+      let galleryIndex = 0;
+
+      const albumBtn = document.getElementById("albumBtn");
+      const galleryModal = document.getElementById("galleryModal");
+      const galleryClose = document.getElementById("galleryClose");
+      const galleryImage = document.getElementById("galleryImage");
+      const galleryCount = document.getElementById("galleryCount");
+      const prevPhoto = document.getElementById("prevPhoto");
+      const nextPhoto = document.getElementById("nextPhoto");
+
+      function updateGallery() {
+        galleryImage.src = galleryImages[galleryIndex];
+        galleryCount.textContent = `${galleryIndex + 1} / ${galleryImages.length}`;
+      }
+
+      function openGallery() {
+        galleryModal.classList.add("open");
+        updateGallery();
+      }
+
+      function closeGallery() {
+        galleryModal.classList.remove("open");
+      }
+
+      function showPrevPhoto() {
+        galleryIndex = (galleryIndex - 1 + galleryImages.length) % galleryImages.length;
+        updateGallery();
+      }
+
+      function showNextPhoto() {
+        galleryIndex = (galleryIndex + 1) % galleryImages.length;
+        updateGallery();
+      }
+
+      albumBtn.addEventListener("click", openGallery);
+      galleryClose.addEventListener("click", closeGallery);
+      prevPhoto.addEventListener("click", showPrevPhoto);
+      nextPhoto.addEventListener("click", showNextPhoto);
+
+      galleryModal.addEventListener("click", (event) => {
+        if (event.target === galleryModal) {
+          closeGallery();
+        }
+      });
+
+      document.addEventListener("keydown", (event) => {
+        if (!galleryModal.classList.contains("open")) return;
+
+        if (event.key === "Escape") {
+          closeGallery();
+        }
+
+        if (event.key === "ArrowLeft") {
+          showPrevPhoto();
+        }
+
+        if (event.key === "ArrowRight") {
+          showNextPhoto();
+        }
+      });
+
+      /* 모바일 손가락 스와이프로 사진 넘기기 */
+      let touchStartX = 0;
+      let touchEndX = 0;
+
+      galleryImage.addEventListener("touchstart", (event) => {
+        touchStartX = event.changedTouches[0].screenX;
+      });
+
+      galleryImage.addEventListener("touchend", (event) => {
+        touchEndX = event.changedTouches[0].screenX;
+        handleSwipe();
+      });
+
+      function handleSwipe() {
+        const swipeDistance = touchEndX - touchStartX;
+
+        if (Math.abs(swipeDistance) < 50) return;
+
+        if (swipeDistance < 0) {
+          showNextPhoto();
+        } else {
+          showPrevPhoto();
+        }
+      }
+    });
+  </script>
+</body>
+</html>

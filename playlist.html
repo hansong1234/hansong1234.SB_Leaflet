@@ -1,0 +1,777 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>StageBurn-tracks</title>
+
+    <style>
+        /* ==================================================
+           1. 전체 디자인 기본 설정
+           ==================================================
+           자주 바꾸는 값들을 위에 모아둔 곳입니다.
+           색상, 한 화면에 보일 책 개수 등을 여기서 바꿀 수 있습니다.
+        */
+        :root {
+            --bg-color: #050505;          /* 전체 배경색 */
+            --text-purple: #8e68b8;       /* PART 제목, 하단 문구 색상 */
+            --text-white: #ffffff;        /* 기본 흰색 글자 */
+
+            --book-purple: #6a4c93;       /* 임시 책(13,14번용) 색상 */
+            --book-black: #111111;
+            --book-beige: #c4b5a0;
+            --book-green: #24342f;
+
+            --visible-books: 6;           /* 한 화면에 안정적으로 보일 책 개수 */
+            --book-gap: 6px;              /* 책 사이 간격 */
+            --shelf-height: 8px;         /* 책장 선반 두께 */
+        }
+
+        /* 모든 요소의 크기 계산을 안정적으로 맞춤 */
+        * {
+            box-sizing: border-box;
+        }
+
+        html,
+        body {
+            margin: 0;
+            width: 100%;
+            min-height: 100%;
+        }
+
+        body {
+            margin: 0;
+            background-color: var(--bg-color);
+            color: var(--text-white);
+
+            /*
+                현재는 책장 느낌을 위해 serif 계열 글씨체를 사용합니다.
+                모바일 앱 같은 깔끔한 느낌으로 바꾸고 싶으면
+                아래 font-family를 Arial, sans-serif 등으로 바꾸면 됩니다.
+            */
+            font-family: 'Times New Roman', serif;
+
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+
+            padding: 20px;
+            overflow-x: hidden; /* 페이지 전체가 가로로 밀리는 것 방지 */
+        }
+
+        /* ==================================================
+           2. 상단 헤더 영역
+           ================================================== */
+        .site-header {
+            width: 100%;
+            display: flex;
+            justify-content: space-between;
+            align-items: flex-start;
+            padding: 20px 10px;
+            margin-bottom: 10px;
+        }
+
+        .logo {
+            font-size: 6px;
+            letter-spacing: 2px;
+            line-height: 1.4;
+        }
+
+        .logo .num {
+            font-size: 20px;
+            display: block;
+            margin-bottom: 2px;
+        }
+
+        /* 메뉴 버튼 */
+        .menu-button {
+            position: absolute;
+            top: 20px;
+            right: 30px;
+            font-size: 1rem;
+            background: none;
+            border: 1px solid white;
+            color: white;
+            padding: 8px 12px;
+            cursor: pointer;
+        }
+        /* 슬라이드 메뉴 */
+        #slide-menu {
+            position: fixed;
+            top: 0;
+            right: -300px;
+            width: 250px;
+            height: 100%;
+            background-color: rgba(15, 15, 26, 0.95);
+            color: white;
+            padding: 60px 20px;
+            box-shadow: -2px 0 10px rgba(0, 0, 0, 0.5);
+            transition: right 0.4s ease;
+            z-index: 999;
+        }
+        #slide-menu ul {
+            list-style: none;
+            padding: 0;
+        }
+        #slide-menu li {
+            margin-bottom: 20px;
+        }
+        #slide-menu a,
+        #slide-menu span {
+            color: white;
+            text-decoration: none;
+            font-size: 1rem;
+            cursor: pointer;
+        }
+        #slide-menu .has-submenu ul {
+            display: none;
+            margin-top: 10px;
+            padding-left: 15px;
+            font-size: 0.95rem;
+        }
+        #slide-menu.open {
+            right: 0;
+        }
+        .close-button {
+            position: absolute;
+            top: 15px;
+            right: 15px;
+            background: none;
+            border: none;
+            color: white;
+            font-size: 1.5rem;
+            cursor: pointer;
+        }
+
+        /* ==================================================
+           3. PART 제목 영역
+           ================================================== */
+        .section-header {
+            width: 100%;
+            display: flex;
+            align-items: baseline;
+            justify-content: space-between;
+            gap: 12px;
+            margin-bottom: 10px;
+            padding: 0 5px;
+        }
+
+        .section-title-wrap {
+            display: flex;
+            align-items: baseline;
+            gap: 15px;
+            min-width: 0;
+        }
+
+        .section-header h2 {
+            color: var(--text-purple);
+            font-size: 1.4rem;
+            margin: 0;
+            font-weight: normal;
+            white-space: nowrap;
+        }
+
+        .section-header span {
+            font-size: 12px;
+            opacity: 0.5;
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+
+        /*
+            scroll-hint는 책이 7권 이상일 때만 보여줄 안내 문구입니다.
+            6권 이하로 딱 맞으면 자동으로 숨김 처리됩니다.
+        */
+        .scroll-hint {
+            display: none;
+            font-size: 10px;
+            opacity: 0.45;
+            letter-spacing: 1px;
+            white-space: nowrap;
+        }
+
+        .shelf-section.is-scrollable .scroll-hint {
+            display: inline;
+        }
+
+        /* ==================================================
+           4. 책장 전체 영역
+           ================================================== */
+        .shelf-section {
+            width: 100%;
+            margin-bottom: 18px;
+        }
+
+        /*
+            shelf-window는 책 줄과 좌우 이동 버튼을 감싸는 영역입니다.
+            책만 좌우 이동하고, 페이지 전체는 이동하지 않게 하기 위해 사용합니다.
+        */
+        .shelf-window {
+            position: relative;
+            width: 100%;
+            padding-bottom: 14px;
+        }
+
+        /* 책장 아래쪽 선반 */
+        .shelf-window::after {
+            content: '';
+            position: absolute;
+            left: -20px;
+            right: -20px;
+            bottom: 20;
+            height: var(--shelf-height);
+            background: linear-gradient(to bottom, #474747, #000);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.8);
+            z-index: 0;
+        }
+
+        /*
+            books-row는 실제 책들이 배치되는 줄입니다.
+
+            상태는 두 가지입니다.
+            1) not-scrollable : 책이 6권 이하일 때, 한 줄에 고정
+            2) scrollable     : 책이 7권 이상일 때, 책 부분만 좌우 이동
+        */
+        .books-row {
+            position: relative;
+            z-index: 1;
+            display: grid;
+            gap: var(--book-gap);
+            padding-top: 10px;
+            padding-bottom: 12px;
+            scroll-behavior: smooth;
+        }
+
+        /* 책이 6권 이하일 때 */
+        .books-row.not-scrollable {
+            grid-template-columns: repeat(var(--visible-books), minmax(0, 1fr));
+            overflow: hidden;
+        }
+
+        /* 책이 7권 이상일 때 */
+        .books-row.scrollable {
+            grid-auto-flow: column;
+            grid-auto-columns: calc((100% - (var(--visible-books) - 1) * var(--book-gap)) / var(--visible-books));
+            overflow-x: auto;
+            overflow-y: hidden;
+            scroll-snap-type: x mandatory;
+            padding-left: 2px;
+            padding-right: 2px;
+        }
+
+        /* 스크롤바 숨김 */
+        .books-row.scrollable::-webkit-scrollbar {
+            display: none;
+        }
+
+        .books-row.scrollable {
+            scrollbar-width: none;
+        }
+
+        /* ==================================================
+           5. 좌우 이동 버튼
+           ================================================== */
+        .shelf-arrow {
+            display: none;
+            position: absolute;
+            top: 45%;
+            transform: translateY(-50%);
+            z-index: 5;
+            width: 28px;
+            height: 44px;
+            border: none;
+            background: rgba(0, 0, 0, 0.55);
+            color: white;
+            font-family: inherit;
+            font-size: 1.6rem;
+            line-height: 1;
+            cursor: pointer;
+        }
+
+        /* 책이 7권 이상일 때만 버튼 표시 */
+        .shelf-section.is-scrollable .shelf-arrow {
+            display: block;
+        }
+
+        .shelf-arrow.left {
+            left: -8px;
+        }
+
+        .shelf-arrow.right {
+            right: -8px;
+        }
+
+        /* ==================================================
+           6. 책 한 권 디자인
+           ================================================== */
+        .book {
+            aspect-ratio: 1 / 3.2;
+            position: relative;
+            cursor: pointer;
+            transition: transform 0.2s;
+            min-width: 0;
+            overflow: hidden;
+            scroll-snap-align: start;
+            border: none;
+            background: none;
+            padding: 0;
+        }
+
+        .book:hover {
+            transform: translateY(-10px);
+            z-index: 5;
+        }
+
+        /*
+            book-card는 책 모양 전체입니다.
+            이미지가 있든 없든 이 박스 안에서 처리합니다.
+        */
+        .book-card {
+            width: 100%;
+            height: 100%;
+            position: relative;
+            overflow: hidden;
+            background: linear-gradient(to bottom, #21003b, #09091f);
+            box-shadow:
+                inset 2px 0 0 rgba(255, 0, 200, 0.45),
+                inset -1px 0 0 rgba(0, 150, 255, 0.3),
+                0 0 10px rgba(144, 0, 255, 0.18);
+        }
+
+        /*
+            실제 열화상 책 이미지가 들어가는 영역입니다.
+            book1.png ~ book12.png가 여기에 표시됩니다.
+        */
+        .book-cover-image {
+            width: 100%;
+            height: 100%;
+            display: block;
+            object-fit: cover;
+        }
+
+        /*
+            곡 제목 / 작곡가 이름은 이미지 아래쪽에 겹쳐서 보입니다.
+            글자가 잘 읽히도록 어두운 그라데이션을 깔았습니다.
+        */
+        .book-meta {
+            position: absolute;
+            left: 0;
+            right: 0;
+            bottom: 5%;
+            padding: 18px 13px 8px;
+            color: white;
+            text-align: left;
+        }
+
+        .book-title {
+            font-size: 0.5rem;
+            line-height: 1.12;
+            word-break: keep-all;
+            margin-bottom: 4px;
+        }
+
+        .book-composer {
+            font-size: 0.42rem;
+            margin-bottom: 4px;
+            opacity: 0.82;
+            text-transform: uppercase;
+            white-space: nowrap;
+            word-break: keep-all;
+            line-height: 1.2;
+        }
+
+
+        /* ==================================================
+           7. 이미지가 없는 임시 책(13,14번용)
+           ================================================== */
+        .fallback-purple { background: linear-gradient(180deg, #5d1fa1 0%, #0a0632 100%); }
+        .fallback-black  { background: linear-gradient(180deg, #1a1a1a 0%, #040404 100%); }
+        .fallback-beige  { background: linear-gradient(180deg, #c4b5a0 0%, #5b4d42 100%); }
+        .fallback-green  { background: linear-gradient(180deg, #31473f 0%, #071712 100%); }
+
+        /*
+            fallback-art는 13번, 14번처럼 아직 이미지가 없을 때
+            열화상 느낌을 대충 유지하기 위한 임시 시각 요소입니다.
+        */
+        .fallback-art {
+            position: absolute;
+            inset: 0;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+
+        .fallback-art::before {
+            content: '';
+            width: 46%;
+            height: 38%;
+            background:
+                radial-gradient(circle, rgba(255, 230, 90, 0.95) 0%, rgba(255, 124, 0, 0.85) 28%, rgba(255, 0, 170, 0.45) 52%, rgba(0, 0, 0, 0) 72%);
+            filter: blur(1px);
+            border-radius: 50%;
+        }
+
+        /*
+            임시 책에는 이미지 속 번호가 없으므로,
+            왼쪽 위에 번호를 코드로 표시합니다.
+        */
+        .fallback-number {
+            position: absolute;
+            top: 10px;
+            left: 8px;
+            font-size: 0.9rem;
+            color: #ffe45c;
+            z-index: 2;
+        }
+
+        /* ==================================================
+           8. 하단 문구
+           ================================================== */
+        footer {
+            margin-top: 40px;
+            text-align: center;
+            padding-bottom: 40px;
+        }
+
+        .star {
+            font-size: 20px;
+            color: var(--text-purple);
+            margin-bottom: 15px;
+        }
+
+        .quote {
+            font-size: 10px;
+            letter-spacing: 3px;
+            color: var(--text-purple);
+            opacity: 0.8;
+            text-transform: uppercase;
+        }
+
+        /* 작은 화면 대응 */
+        @media (max-width: 360px) {
+            body {
+                padding: 16px;
+            }
+
+            .section-header h2 {
+                font-size: 1.25rem;
+            }
+
+            .menu-button {
+                font-size: 0.9rem;
+                padding: 6px 10px;
+                right: 20px;
+            }
+
+            #slide-menu {
+                width: 200px;
+                padding: 40px 15px;
+            }
+
+            .shelf-arrow {
+                width: 24px;
+                height: 40px;
+                font-size: 1.4rem;
+            }
+
+            .book-meta {
+                padding: 20px 5px 8px;
+            }
+
+            .book-title {
+                font-size: 0.55rem;
+            }
+
+            .book-composer {
+                font-size: 0.4rem;
+            }
+        }
+
+      .top-logo-wrap {
+      position: absolute;
+      top: 34px;
+      left: 50%;
+      transform: translateX(-50%);
+      z-index: 15;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      pointer-events: none;
+    }
+
+    .top-logo {
+      width: 60px;
+      height: auto;
+      display: block;
+      object-fit: contain;
+    }
+    </style>
+</head>
+<body>
+    <div class="top-logo-wrap">
+      <img src="img/SB_logo.webp" alt="STAGE BURN 로고" class="top-logo">
+    </div>
+    <!-- ==================================================
+         9. 상단 헤더
+         ================================================== -->
+    <header class="site-header">
+        <div class="logo">
+            <!-- 전체 곡 개수는 JavaScript가 자동으로 넣습니다. -->
+            <span class="num" id="totalSongCount">14</span>
+            <span>THE</span><br>
+            <span>SOUND OF</span><br>
+            <span>STAGEBURN</span>
+        </div>
+
+        <!-- 메뉴 버튼 -->
+        <button class="menu-button" onclick="toggleMenu()">☰</button>
+        <!-- 슬라이드 메뉴 -->
+        <div id="slide-menu">
+            <!-- 닫기 버튼 -->
+            <button class="close-button" onclick="toggleMenu()">✕</button>
+            <ul>
+                <li><a href="SB_about.html">동아리 소개</a></li>
+                <li><a href="tracks.html">트랙리스트</a></li>
+                <li><a href="playlist.html">플레이리스트</a></li>
+            </ul>
+        </div>
+    </header>
+
+    <!-- JavaScript가 PART 1, PART 2를 이 안에 자동으로 그려줍니다. -->
+    <main id="playlistArea"></main>
+
+    <footer>
+        <div class="star">✦</div>
+        <p class="quote">MUSIC SPEAKS<br>WHERE WORDS FAIL.</p>
+    </footer>
+
+    <script>
+        /* ==================================================
+           10. 여기만 수정하면 됩니다
+           ==================================================
+           곡 제목 / 작곡가 / 이미지 경로 / PART 구성을 바꿀 때는
+           아래 parts 데이터만 수정하세요.
+        */
+
+        // 메뉴
+        function toggleMenu() {
+            const menu = document.getElementById("slide-menu");
+            menu.classList.toggle("open");
+        }
+
+        function toggleSubMenu() {
+            const submenu = document.getElementById("sub-menu");
+            submenu.style.display = submenu.style.display === "block" ? "none" : "block";
+        }
+
+        // 한 화면에 안정적으로 보일 책 개수
+        // 6개 이하면 좌우 이동 없이 고정
+        // 7개 이상이면 책 부분만 좌우 이동
+        const visibleBooks = 5;
+
+        /*
+            parts 데이터 설명
+
+            partTitle : 화면에 보이는 PART 이름
+            books     : 그 PART에 들어가는 책 목록
+
+            book 정보 설명
+            number   : 곡 번호 (song번호.html과 연결)
+            composer : 작곡가, 팀명, 아티스트명
+            title    : 곡 제목
+            cover    : 열화상 책 이미지 경로 (없으면 임시 책으로 표시)
+            fallback : 이미지가 없을 때 임시 책 색상
+        */
+        const parts = [
+            {
+                partTitle: "PART 1",
+                books: [
+                    { number: 1, composer: "김진우-신윤학<br>송태웅", title: "노땡큐", cover: "img/book1.webp" },
+                    { number: 2, composer: "송태웅<br>장용하", title: "Bounce", cover: "img/book2.webp" },
+                    { number: 3, composer: "전종형<br>송태웅", title: "탈피", cover: "img/book3.webp" },
+                    { number: 4, composer: "신지민<br>정예원", title: "X", cover: "img/book4.webp" },
+                    { number: 5, composer: "원태연-정의인<br>송태웅-신윤학", title: "HUNNIT BANDS", cover: "img/book5.webp" },
+                    
+                ]
+            },
+            {
+                partTitle: "PART 2",
+                books: [
+                    { number: 6, composer: "김진우<br>신윤학", title: "MLJ", cover: "img/book6.webp" },
+                    { number: 7, composer: "원태연-장용하<br>홍준표", title: "I did it", cover: "img/book7.webp" },
+                    { number: 8,  composer: "김진우<br>전종현", title: "프라다", cover: "img/book8.webp" },
+                    { number: 9,  composer: "신윤학<br>송태웅", title: "발칙", cover: "img/book9.webp" },
+                    { number: 10, composer: "작곡가 입력", title: "아퍼 band ver", cover: "img/book10.webp" },
+                    /*{ number: 11, composer: "작곡가 입력", title: "곡 제목 입력", cover: "img/book11.webp" },
+                    { number: 12, composer: "작곡가 입력", title: "곡 제목 입력", cover: "img/book12.webp" },*/
+
+                    /*
+                        13번, 14번은 아직 이미지가 없으므로 임시 책 스타일로 둡니다.
+                        나중에 이미지가 생기면 아래처럼 바꾸면 됩니다.
+
+                        예:
+                        { number: 13, composer: "...", title: "...", cover: "img/book13.webp" }
+                    { number: 13, composer: "작곡가 입력", title: "곡 제목 입력", fallback: "purple" },
+                    { number: 14, composer: "작곡가 입력", title: "곡 제목 입력", fallback: "black" }
+                    */
+                ]
+            }
+        ];
+
+        /* ==================================================
+           11. 아래는 기능 코드입니다.
+           특별한 이유가 없으면 수정하지 않는 것이 좋습니다.
+           ================================================== */
+
+        const playlistArea = document.getElementById("playlistArea");
+        const totalSongCountEl = document.getElementById("totalSongCount");
+
+        // 숫자를 01, 02처럼 두 자리로 표시
+        function padNumber(number) {
+            return String(number).padStart(2, "0");
+        }
+
+        // 전체 곡 수 계산
+        function getTotalSongCount() {
+            return parts.reduce(function (total, part) {
+                return total + part.books.length;
+            }, 0);
+        }
+
+        // PART 범위 표시 텍스트 생성
+        // 예: 01 — 07
+        function getPartRangeText(books) {
+            const firstNumber = books[0].number;
+            const lastNumber = books[books.length - 1].number;
+            return padNumber(firstNumber) + " — " + padNumber(lastNumber);
+        }
+
+        // 책 클릭 시 song번호.html로 이동
+        function openSong(songNumber) {
+            setTimeout(function() {
+                window.location.href = "TRSQ/song" + songNumber + ".html";
+            }, 200); // 0.2초 후에 이동 (책 클릭 애니메이션이 먼저 보이도록)
+        
+        }
+
+        // 책 1권 요소 생성
+        function createBookElement(book) {
+            const bookEl = document.createElement("button");
+            bookEl.className = "book";
+            bookEl.type = "button";
+            bookEl.setAttribute("aria-label", padNumber(book.number) + "번 곡 " + book.title + " 열기");
+
+            let coverHtml = "";
+
+            // 1) 이미지가 있는 책
+            if (book.cover) {
+                coverHtml = `
+                    <div class="book-card">
+                        <img class="book-cover-image" src="${book.cover}" alt="${padNumber(book.number)}번 책 표지">
+                        <div class="book-meta">
+                            <div class="book-title">${book.title}</div>
+                            <div class="book-composer">${book.composer}</div>
+                        </div>
+                    </div>
+                `;
+            }
+            // 2) 이미지가 없는 임시 책
+            else {
+                const fallbackClass = "fallback-" + (book.fallback || "purple");
+
+                coverHtml = `
+                    <div class="book-card ${fallbackClass}">
+                        <div class="fallback-number">${padNumber(book.number)}</div>
+                        <div class="fallback-art"></div>
+                        <div class="book-meta">
+                            <div class="book-title">${book.title}</div>
+                            <div class="book-composer">${book.composer}</div>
+                        </div>
+                    </div>
+                `;
+            }
+
+            bookEl.innerHTML = coverHtml;
+
+            bookEl.addEventListener("click", function () {
+                openSong(book.number);
+            });
+
+            return bookEl;
+        }
+
+        // 좌우 이동 버튼 클릭 시 책 줄을 한 권 정도씩 이동
+        function scrollBookRow(rowEl, direction) {
+            const firstBook = rowEl.querySelector(".book");
+            if (!firstBook) return;
+
+            const bookWidth = firstBook.getBoundingClientRect().width;
+            const gap = parseFloat(getComputedStyle(rowEl).columnGap) || 0;
+            const moveAmount = bookWidth + gap;
+
+            rowEl.scrollBy({
+                left: direction * moveAmount,
+                behavior: "smooth"
+            });
+        }
+
+        // PART 하나 생성
+        function createShelfSection(part) {
+            const isScrollable = part.books.length > visibleBooks;
+
+            const sectionEl = document.createElement("section");
+            sectionEl.className = "shelf-section" + (isScrollable ? " is-scrollable" : "");
+
+            sectionEl.innerHTML = `
+                <div class="section-header">
+                    <div class="section-title-wrap">
+                        <h2>${part.partTitle}</h2>
+                        <span>${getPartRangeText(part.books)}</span>
+                    </div>
+                    <div class="scroll-hint">SCROLL →</div>
+                </div>
+
+                <div class="shelf-window">
+                    <button class="shelf-arrow left" type="button" aria-label="왼쪽으로 이동">‹</button>
+                    <div class="books-row ${isScrollable ? "scrollable" : "not-scrollable"}"></div>
+                    <button class="shelf-arrow right" type="button" aria-label="오른쪽으로 이동">›</button>
+                </div>
+            `;
+
+            const rowEl = sectionEl.querySelector(".books-row");
+            const leftBtn = sectionEl.querySelector(".shelf-arrow.left");
+            const rightBtn = sectionEl.querySelector(".shelf-arrow.right");
+
+            part.books.forEach(function (book) {
+                rowEl.appendChild(createBookElement(book));
+            });
+
+            // 책이 7권 이상일 때만 좌우 버튼 활성화
+            if (isScrollable) {
+                leftBtn.addEventListener("click", function () {
+                    scrollBookRow(rowEl, -1);
+                });
+
+                rightBtn.addEventListener("click", function () {
+                    scrollBookRow(rowEl, 1);
+                });
+            }
+
+            return sectionEl;
+        }
+
+        // 전체 플레이리스트 렌더링
+        function renderPlaylist() {
+            playlistArea.innerHTML = "";
+            totalSongCountEl.textContent = getTotalSongCount();
+            document.documentElement.style.setProperty("--visible-books", visibleBooks);
+
+            parts.forEach(function (part) {
+                playlistArea.appendChild(createShelfSection(part));
+            });
+        }
+
+        renderPlaylist();
+    </script>
+</body>
+</html>
